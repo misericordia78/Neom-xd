@@ -1,0 +1,398 @@
+
+-- NEON FUSION V4.1 | HORIZONTAL UI
+-- Horizontal | Abrir/Cerrar | RGB | Crosshair combinado
+-- Roblox Lua / entorno compatible con LocalPlayer
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+local old = playerGui:FindFirstChild("NeonFusionV41")
+if old then old:Destroy() end
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "NeonFusionV41"
+gui.IgnoreGuiInset = true
+gui.ResetOnSpawn = false
+gui.DisplayOrder = 999
+gui.Parent = playerGui
+
+local color = Color3.fromRGB(0, 255, 255)
+local hue = 0
+local rgb = true
+local spinning = false
+local spinSpeed = 180
+local angle = 0
+local size = 8
+local gap = 5
+local thickness = 2
+local visible = true
+local selected = {Cruz = true}
+local pieces = {}
+local buttons = {}
+local panelOpen = true
+
+local styles = {
+    "Cruz", "Punto", "Cuadrado", "X", "Diamante",
+    "Doble cruz", "Cuatro puntos", "Circulo",
+    "Tactica", "Estrella"
+}
+
+local function tween(obj, props, duration)
+    if obj and obj.Parent then
+        TweenService:Create(
+            obj,
+            TweenInfo.new(duration or 0.25, Enum.EasingStyle.Quint,
+                Enum.EasingDirection.Out),
+            props
+        ):Play()
+    end
+end
+
+-- Dibujo de la mira: solo esta capa gira
+local function clearPieces()
+    for _, p in ipairs(pieces) do p:Destroy() end
+    table.clear(pieces)
+end
+
+local function part(w, h, x, y, rot, round)
+    local a = math.rad(angle)
+    local rx = x * math.cos(a) - y * math.sin(a)
+    local ry = x * math.sin(a) + y * math.cos(a)
+
+    local f = Instance.new("Frame")
+    f.AnchorPoint = Vector2.new(0.5, 0.5)
+    f.Position = UDim2.new(0.5, rx, 0.5, ry)
+    f.Size = UDim2.fromOffset(w, h)
+    f.Rotation = rot + angle
+    f.BackgroundColor3 = color
+    f.BorderSizePixel = 0
+    f.Visible = visible
+    f.Parent = gui
+
+    if round then
+        local c = Instance.new("UICorner")
+        c.CornerRadius = UDim.new(1, 0)
+        c.Parent = f
+    end
+    table.insert(pieces, f)
+end
+
+local function bar(x, y, len, rot, thick)
+    part(len, thick or thickness, x, y, rot, false)
+end
+
+local function drawStyle(name)
+    local s, t, g = size, thickness, gap
+
+    if name == "Cruz" then
+        bar(0,-g-s/2,s,90); bar(0,g+s/2,s,90)
+        bar(-g-s/2,0,s,0); bar(g+s/2,0,s,0)
+    elseif name == "Punto" then
+        part(t*2.5,t*2.5,0,0,0,true)
+    elseif name == "Cuadrado" then
+        local d=s+g
+        bar(0,-d,s*2,0); bar(0,d,s*2,0)
+        bar(-d,0,s*2,90); bar(d,0,s*2,90)
+    elseif name == "X" then
+        bar(0,0,s*2.2,45); bar(0,0,s*2.2,-45)
+    elseif name == "Diamante" then
+        local d=s+g
+        bar(-d/2,-d/2,d*1.42,45)
+        bar(d/2,-d/2,d*1.42,-45)
+        bar(-d/2,d/2,d*1.42,-45)
+        bar(d/2,d/2,d*1.42,45)
+    elseif name == "Doble cruz" then
+        for _,d in ipairs({g+s/2,g+s+5}) do
+            local len = d == g+s/2 and s or s/2
+            bar(0,-d,len,90); bar(0,d,len,90)
+            bar(-d,0,len,0); bar(d,0,len,0)
+        end
+    elseif name == "Cuatro puntos" then
+        for _,x in ipairs({-g-s/2,g+s/2}) do
+            for _,y in ipairs({-g-s/2,g+s/2}) do
+                part(t*2,t*2,x,y,0,true)
+            end
+        end
+    elseif name == "Circulo" then
+        for i=1,32 do
+            local a=i*math.pi*2/32
+            part(t*1.5,t*1.5,math.cos(a)*(s+g),
+                math.sin(a)*(s+g),0,true)
+        end
+    elseif name == "Tactica" then
+        local d=s+g
+        bar(0,-d,s,90); bar(0,d,s,90)
+        bar(-d,0,s,0); bar(d,0,s,0)
+        part(t*2,t*2,0,0,0,true)
+    elseif name == "Estrella" then
+        for i=0,3 do bar(0,0,s*2,i*45) end
+    end
+end
+
+local function redraw()
+    clearPieces()
+    for _,name in ipairs(styles) do
+        if selected[name] then drawStyle(name) end
+    end
+end
+
+-- PANEL HORIZONTAL
+local panel = Instance.new("Frame")
+panel.Name = "HorizontalPanel"
+panel.Size = UDim2.new(0.94,0,0,220)
+panel.Position = UDim2.new(0.03,0,1,-235)
+panel.BackgroundColor3 = Color3.fromRGB(12,15,24)
+panel.BorderSizePixel = 0
+panel.Parent = gui
+
+local stroke = Instance.new("UIStroke")
+stroke.Color = color
+stroke.Thickness = 2
+stroke.Parent = panel
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(0,200,0,35)
+title.Position = UDim2.fromOffset(12,2)
+title.BackgroundTransparency = 1
+title.Text = "NEON FUSION // V4.1"
+title.TextColor3 = color
+title.Font = Enum.Font.GothamBlack
+title.TextSize = 16
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = panel
+
+local close = Instance.new("TextButton")
+close.Size = UDim2.fromOffset(38,32)
+close.Position = UDim2.new(1,-48,0,5)
+close.BackgroundColor3 = Color3.fromRGB(155,35,60)
+close.Text = "✕"
+close.TextColor3 = Color3.new(1,1,1)
+close.Font = Enum.Font.GothamBlack
+close.TextSize = 16
+close.BorderSizePixel = 0
+close.Parent = panel
+
+local scroll = Instance.new("ScrollingFrame")
+scroll.Position = UDim2.fromOffset(10,42)
+scroll.Size = UDim2.new(1,-20,1,-52)
+scroll.BackgroundTransparency = 1
+scroll.BorderSizePixel = 0
+scroll.ScrollBarThickness = 4
+scroll.ScrollingDirection = Enum.ScrollingDirection.X
+scroll.ScrollBarImageColor3 = color
+scroll.CanvasSize = UDim2.fromOffset(0,0)
+scroll.AutomaticCanvasSize = Enum.AutomaticSize.X
+scroll.Parent = panel
+
+local row = Instance.new("UIListLayout")
+row.FillDirection = Enum.FillDirection.Horizontal
+row.Padding = UDim.new(0,8)
+row.SortOrder = Enum.SortOrder.LayoutOrder
+row.Parent = scroll
+
+local function label(text)
+    local l=Instance.new("TextLabel")
+    l.Size=UDim2.fromOffset(125,36)
+    l.BackgroundTransparency=1
+    l.Text=text
+    l.TextColor3=Color3.fromRGB(180,195,215)
+    l.Font=Enum.Font.GothamBold
+    l.TextSize=11
+    l.TextWrapped=true
+    l.Parent=scroll
+end
+
+local function button(text, callback)
+    local b=Instance.new("TextButton")
+    b.Size=UDim2.fromOffset(125,42)
+    b.BackgroundColor3=Color3.fromRGB(27,32,46)
+    b.BorderSizePixel=0
+    b.Text=text
+    b.TextColor3=Color3.new(1,1,1)
+    b.Font=Enum.Font.GothamBold
+    b.TextSize=11
+    b.TextWrapped=true
+    b.AutoButtonColor=false
+    b.Parent=scroll
+
+    local s=Instance.new("UIStroke")
+    s.Color=color
+    s.Thickness=1
+    s.Parent=b
+
+    b.MouseEnter:Connect(function()
+        tween(b,{BackgroundColor3=color},0.18)
+        tween(s,{Color=Color3.new(1,1,1)},0.18)
+    end)
+    b.MouseLeave:Connect(function()
+        tween(b,{BackgroundColor3=Color3.fromRGB(27,32,46)},0.18)
+        tween(s,{Color=color},0.18)
+    end)
+    b.MouseButton1Click:Connect(callback)
+    table.insert(buttons,b)
+    return b
+end
+
+local function refreshColors()
+    title.TextColor3=color
+    stroke.Color=color
+    scroll.ScrollBarImageColor3=color
+    for _,b in ipairs(buttons) do
+        local s=b:FindFirstChildOfClass("UIStroke")
+        if s then s.Color=color end
+    end
+end
+
+label("COMBINA FORMAS")
+local styleButtons={}
+for _,name in ipairs(styles) do
+    local n=name
+    styleButtons[n]=button("+ "..n,function()
+        selected[n]=not selected[n]
+        styleButtons[n].Text=(selected[n] and "✓ " or "+ ")..n
+        redraw()
+    end)
+end
+
+button("LIMPIAR MIRAS",function()
+    for _,n in ipairs(styles) do
+        selected[n]=false
+        styleButtons[n].Text="+ "..n
+    end
+    redraw()
+end)
+
+button("COLOR CYAN",function()
+    rgb=false
+    color=Color3.fromRGB(0,255,255)
+    redraw(); refreshColors()
+end)
+
+button("COLOR MAGENTA",function()
+    rgb=false
+    color=Color3.fromRGB(255,0,200)
+    redraw(); refreshColors()
+end)
+
+button("COLOR VERDE",function()
+    rgb=false
+    color=Color3.fromRGB(0,255,80)
+    redraw(); refreshColors()
+end)
+
+local rgbButton
+rgbButton=button("RGB: ON",function()
+    rgb=not rgb
+    rgbButton.Text=rgb and "RGB: ON" or "RGB: OFF"
+end)
+
+button("TAMAÑO -",function()
+    size=math.max(3,size-2)
+    redraw()
+end)
+
+button("TAMAÑO +",function()
+    size=math.min(35,size+2)
+    redraw()
+end)
+
+button("GIRAR -15°",function()
+    angle=(angle-15)%360
+    redraw()
+end)
+
+button("GIRAR +15°",function()
+    angle=(angle+15)%360
+    redraw()
+end)
+
+local spinButton
+spinButton=button("▶ INICIAR GIRO",function()
+    spinning=not spinning
+    spinButton.Text=spinning and "■ DETENER GIRO" or "▶ INICIAR GIRO"
+end)
+
+button("VELOCIDAD DE GIRO",function()
+    spinSpeed=spinSpeed==180 and 360 or (spinSpeed==360 and 90 or 180)
+end)
+
+button("OCULTAR / MOSTRAR MIRA",function()
+    visible=not visible
+    redraw()
+end)
+
+-- ABRIR / CERRAR
+local open=Instance.new("TextButton")
+open.Size=UDim2.fromOffset(150,42)
+open.Position=UDim2.new(0.5,-75,1,-60)
+open.BackgroundColor3=Color3.fromRGB(12,15,24)
+open.BorderSizePixel=0
+open.Text="✦ ABRIR FUSION"
+open.TextColor3=color
+open.Font=Enum.Font.GothamBlack
+open.TextSize=13
+open.Visible=false
+open.Parent=gui
+
+local openStroke=Instance.new("UIStroke")
+openStroke.Color=color
+openStroke.Thickness=2
+openStroke.Parent=open
+
+local function setOpen(state)
+    panelOpen=state
+    if state then
+        panel.Visible=true
+        panel.Position=UDim2.new(0.03,0,1,30)
+        tween(panel,{Position=UDim2.new(0.03,0,1,-235)},0.35)
+        open.Visible=false
+    else
+        tween(panel,{Position=UDim2.new(0.03,0,1,30)},0.3)
+        open.Visible=true
+        tween(open,{BackgroundColor3=color},0.2)
+        task.delay(0.32,function()
+            if panel.Parent and not panelOpen then
+                panel.Visible=false
+            end
+        end)
+    end
+end
+
+close.MouseButton1Click:Connect(function()
+    setOpen(false)
+end)
+open.MouseButton1Click:Connect(function()
+    setOpen(true)
+end)
+
+-- RGB Y GIRO CONTINUO
+local connection
+connection=RunService.RenderStepped:Connect(function(dt)
+    if not gui.Parent then
+        connection:Disconnect()
+        return
+    end
+
+    if spinning then
+        angle=(angle+spinSpeed*dt)%360
+    end
+
+    if rgb then
+        hue=(hue+dt*0.22)%1
+        color=Color3.fromHSV(hue,0.9,1)
+    end
+
+    if spinning or rgb then
+        redraw()
+        refreshColors()
+        open.TextColor3=color
+        openStroke.Color=color
+    end
+end)
+
+redraw()
+refreshColors()
